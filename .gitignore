@@ -370,3 +370,5 @@ fabric.properties
 /captures
 .externalNativeBuild
 .cxx
+
+/src/.idea
