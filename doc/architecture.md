@@ -20,7 +20,7 @@ The discovery/add process is initiated by the user activating the Initiates Came
 Once returned, it will be cross referenced with Discogs, to identify the proper album.  If the album is not found, a message to that extent will be presented.  If found the user will receive results in the Identification window. The database will be queried, using album name and artist, to determine if the album is in the collection. The User will have the option to add or leave this window.  Should they add, the album will be added to the collection.
 The view/remove is activated by View Collection button.  This will depict the current Collection database.  The database will be composed of the album name, and artist, as well as a link the Discogs page.  The Remove function will allow the User to remove an entry from the collection.
 
-![DIAGRAM GOES HERE!!!!!!!](LINK)
+![DIAGRAM GOES HERE!!!!!!!](https://github.com/IUS-CS/s20-project-the-recordsetters/blob/Jeffs_Branch/Overview.PNG)
 
 3	Goals and Constraints
 
