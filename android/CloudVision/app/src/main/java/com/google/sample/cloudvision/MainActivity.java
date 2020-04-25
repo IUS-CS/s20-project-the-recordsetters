@@ -17,12 +17,14 @@
 package com.google.sample.cloudvision;
 
 import android.Manifest;
+import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.TestLooperManager;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
@@ -31,6 +33,7 @@ import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
+import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -49,17 +52,29 @@ import com.google.api.services.vision.v1.model.BatchAnnotateImagesResponse;
 import com.google.api.services.vision.v1.model.EntityAnnotation;
 import com.google.api.services.vision.v1.model.Feature;
 import com.google.api.services.vision.v1.model.Image;
+import com.google.api.services.vision.v1.model.WebDetection;
+import com.google.api.services.vision.v1.model.WebEntity;
+
+import org.w3c.dom.Text;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 
+import okhttp3.OkHttpClient;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
 
-public class MainActivity extends AppCompatActivity {
+
+public class MainActivity<val> extends AppCompatActivity {
     private static final String CLOUD_VISION_API_KEY = BuildConfig.API_KEY;
     public static final String FILE_NAME = "temp.jpg";
     private static final String ANDROID_CERT_HEADER = "X-Android-Cert";
@@ -75,6 +90,8 @@ public class MainActivity extends AppCompatActivity {
 
     private TextView mImageDetails;
     private ImageView mMainImage;
+
+    public TextView textViewResult;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -95,6 +112,8 @@ public class MainActivity extends AppCompatActivity {
 
         mImageDetails = findViewById(R.id.image_details);
         mMainImage = findViewById(R.id.main_image);
+
+
     }
 
     public void startGalleryChooser() {
@@ -226,10 +245,14 @@ public class MainActivity extends AppCompatActivity {
 
             // add the features we want
             annotateImageRequest.setFeatures(new ArrayList<Feature>() {{
-                Feature labelDetection = new Feature();
-                labelDetection.setType("LABEL_DETECTION");
-                labelDetection.setMaxResults(MAX_LABEL_RESULTS);
-                add(labelDetection);
+                Feature webDetection = new Feature();
+                webDetection.setType("WEB_DETECTION");
+                webDetection.setMaxResults(2);
+                add(webDetection);
+                //Feature labelDetection = new Feature();
+                //labelDetection.setType("LABEL_DETECTION");
+                //labelDetection.setMaxResults(MAX_LABEL_RESULTS);
+                //add(labelDetection);
             }});
 
             // Add the list of one thing to the request
@@ -276,6 +299,7 @@ public class MainActivity extends AppCompatActivity {
                 TextView imageDetail = activity.findViewById(R.id.image_details);
                 imageDetail.setText(result);
             }
+            activity.getDiscogsRelease(getSearchString());
         }
     }
 
@@ -313,19 +337,125 @@ public class MainActivity extends AppCompatActivity {
         return Bitmap.createScaledBitmap(bitmap, resizedWidth, resizedHeight, false);
     }
 
-    private static String convertResponseToString(BatchAnnotateImagesResponse response) {
-        StringBuilder message = new StringBuilder("I found these things:\n\n");
+    public static String convertResponseToString(BatchAnnotateImagesResponse response) {
+        String searchString = "";
 
-        List<EntityAnnotation> labels = response.getResponses().get(0).getLabelAnnotations();
-        if (labels != null) {
-            for (EntityAnnotation label : labels) {
-                message.append(String.format(Locale.US, "%.3f: %s", label.getScore(), label.getDescription()));
+        StringBuilder message = new StringBuilder("I found the following album:\n\n");
+
+        WebDetection labels = response.getResponses().get(0).getWebDetection();
+        List<WebEntity> labels2 = labels.getWebEntities();
+        if (labels2 != null) {
+            for (WebEntity label : labels2) {
+                message.append(label.getDescription());
                 message.append("\n");
+                searchString += label.getDescription();
+                searchString += " ";
             }
         } else {
             message.append("nothing");
         }
 
+        setSearchString(searchString);
         return message.toString();
+    }
+
+    private static String SearchString;
+
+    private static String getSearchString() {
+        return SearchString;
+    }
+
+    private static void setSearchString(String searchString) {
+        SearchString = searchString;
+    }
+
+    public void getDiscogsRelease(String albumAndArtistString){
+        textViewResult = findViewById(R.id.image_details);
+        String API_BASE_URL = "https://api.discogs.com/";
+
+        OkHttpClient.Builder httpClient = new OkHttpClient.Builder();
+
+        Retrofit.Builder builder =
+                new Retrofit.Builder()
+                        .baseUrl(API_BASE_URL)
+                        .addConverterFactory(GsonConverterFactory.create());
+
+        Retrofit retrofit = builder.client(httpClient.build()).build();
+
+        DiscogsApi client =  retrofit.create(DiscogsApi.class);
+
+        Call<SearchResponse> call = client.getSearchResponse(albumAndArtistString,
+                "******DISCOGS KEY GOES HERE******",
+                "******DISCOGS SECRET GOES HERE******",
+                1);
+
+        call.enqueue(new Callback<SearchResponse>() {
+            @Override
+            public void onResponse(Call<SearchResponse> call, Response<SearchResponse> response) {
+                if (!response.isSuccessful()){
+                    textViewResult.setText("Error: " + response.code());
+                    return;
+                }
+
+                Collection<Results> results = response.body().results;
+
+                int master_id = 0;
+                for (Results result:results){
+                    master_id=result.getMaster_id();
+
+                    //textViewResult.append(message);
+                }
+                getDiscogsTracks(master_id);
+            }
+
+            @Override
+            public void onFailure(Call<SearchResponse> call, Throwable t) {
+                textViewResult.setText("Error: " + t.getMessage());
+            }
+        });
+    }
+
+    public void getDiscogsTracks(int master_id){
+        textViewResult = findViewById(R.id.image_details);
+        String API_BASE_URL = "https://api.discogs.com/";
+
+        OkHttpClient.Builder httpClient = new OkHttpClient.Builder();
+
+        Retrofit.Builder builder =
+                new Retrofit.Builder()
+                        .baseUrl(API_BASE_URL)
+                        .addConverterFactory(GsonConverterFactory.create());
+
+        Retrofit retrofit = builder.client(httpClient.build()).build();
+
+        DiscogsApi client =  retrofit.create(DiscogsApi.class);
+
+        Call<ReleaseResponse> call = client.getReleaseResponse(master_id);
+
+        call.enqueue(new Callback<ReleaseResponse>() {
+            @Override
+            public void onResponse(Call<ReleaseResponse> call, Response<ReleaseResponse> response) {
+                if (!response.isSuccessful()){
+                    textViewResult.setText("Error: " + response.code());
+                    return;
+                }
+
+                Collection<Tracklist> tracklists = response.body().tracklist;
+
+                int index = 1;
+                textViewResult.append("Tracks: " + "\n");
+                for (Tracklist tracklist:tracklists){
+                    String message = "";
+                    message=index + ": " + tracklist.getTitle() + "\n";;
+                    index++;
+                    textViewResult.append(message);
+                }
+            }
+
+            @Override
+            public void onFailure(Call<ReleaseResponse> call, Throwable t) {
+                textViewResult.setText("Error: " + t.getMessage());
+            }
+        });
     }
 }
