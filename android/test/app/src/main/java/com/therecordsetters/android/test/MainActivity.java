@@ -43,8 +43,8 @@ public class MainActivity extends AppCompatActivity {
         DiscogsClient client =  retrofit.create(DiscogsClient.class);
 /*
         Call<Tracklist> call = client.infoForArtist("Pink Floyd Dark Side Of The Moon",
-                "yVJvGKOaNBuLpUOkDwoJ",
-                "SwfdineoyCxyMfxMGAoEmohQxkqrGjgl",
+                "",
+                "",
                 1);
 */
 
